@@ -57,9 +57,17 @@ Capability call
 - Python virtual environment created and activated.
 - Playwright installed.
 - Git repository initialized.
-- Core architecture not finalized.
+✓ local Git repo
+✓ GitHub remote
+✓ first push complete
+✓ .gitignore fixed
 - Target application selected: Local legacy banking demo.
+- Core architecture not finalized.
 - Artifact schema not yet designed.
+
+
+
+
 
 ## Next Task
 draft Architecture v0.

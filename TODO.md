@@ -1,9 +1,9 @@
 # TODO
 
 ## Phase 1 — Foundation
-- [ ] Initialize Git repo
-- [ ] Create project context files
-- [ ] Choose target application
+- [x] Initialize Git repo
+- [x] Create project context files
+- [x] Choose target application
 - [ ] Draft architecture v0
 - [ ] Confirm tech stack
 
