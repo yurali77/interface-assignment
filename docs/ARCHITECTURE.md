@@ -366,7 +366,7 @@ Capability Artifact
 Capability Registry
 ```
 
-The Registry will eventually be responsible for concerns such as:
+The Registry is responsible for concerns such as:
 
 ```text
 capability lookup
@@ -401,27 +401,30 @@ Replay does not invoke an LLM for normal next-action decisions.
 The basic replay flow is:
 
 ```text
-Capability Artifact + Inputs
+EffectiveCapability + Inputs
 ↓
-Validate inputs
+Validate request, inputs, capability, and live session
 ↓
-Resolve next artifact step
+Select current artifact step
 ↓
 Policy check
 ↓
 Execute action through Surface
 ↓
-Observe result
+Observe resulting state
 ↓
-Verify step expectation
+Evaluate declared runtime conditions
 ↓
-Detect business outcome / recoverable condition / hard failure
+If execution continues:
+    verify step completion
 ↓
-Continue
+Mark step completed
+↓
+Continue to next step
 ↓
 Verify final success checkpoint
 ↓
-Extract required outputs
+Verify required outputs
 ↓
 Structured Replay Result
 ```
@@ -785,7 +788,7 @@ The initial implementation does not need to implement production-scale multi-ten
 
 The important architectural requirement is that tenant differences do not require duplicating the complete capability whenever the underlying workflow remains the same.
 
-Drift detection and override resolution will be designed separately.
+Drift detection and override resolution are defined by the Capability Registry contract in `docs/CAPABILITY_REGISTRY.md`.
 
 ---
 
@@ -793,14 +796,19 @@ Drift detection and override resolution will be designed separately.
 
 The primary module boundaries are summarized below.
 
-### Discovery Agent ↔ LLM Client
+### Orchestration ↔ Capability Registry
 
 ```text
 Input:
-Goal + Observation + relevant context
+capability_id
++ tenant context
++ application/vendor context
++ application version
 
 Output:
-ProposedAction / semantic interpretation
+EffectiveCapability
+or
+ResolutionFailure
 ```
 
 The LLM reasons; the Discovery Agent orchestrates.

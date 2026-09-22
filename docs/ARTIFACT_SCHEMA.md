@@ -155,7 +155,6 @@ The independent Policy/Safety layer remains responsible for the final:
 ```text
 ALLOW
 BLOCK
-REQUIRE_CONFIRMATION
 REQUIRE_HUMAN
 ```
 
@@ -595,8 +594,8 @@ recoverable_conditions:
       type: SEMANTIC_STATE
       state: LOADING
     recovery_policy:
-      type: RETRY
-      max_attempts: 1
+      type: RETRY_STEP
+      max_retries: 1
 ```
 
 Recovery must remain bounded and deterministic.
@@ -623,6 +622,31 @@ UNEXPECTED_DIALOG
 ```
 
 The Artifact defines capability-specific failure semantics. The Replay Engine owns the common structured failure response and stopping behavior.
+
+By default, a matched hard failure terminates Replay with a structured FAILURE.
+A hard failure may explicitly declare:
+escalation_policy: REQUIRE_HUMAN
+
+When present, Replay pauses the current run and returns ESCALATED instead of terminating with FAILURE.
+No other hard-failure escalation policies are supported in v0.
+Example:
+hard_failures:
+  - code: UNEXPECTED_DIALOG
+    description: An unexpected dialog blocks deterministic execution.
+    applies_at: open_subaccount
+    detection_condition:
+      type: SEMANTIC_STATE
+      state: UNEXPECTED_DIALOG
+    escalation_policy: REQUIRE_HUMAN
+
+If escalation_policy is omitted:
+matched hard failure
+→ FAILURE
+
+If escalation_policy: REQUIRE_HUMAN is declared:
+matched hard failure
+→ ESCALATED
+→ same-session human handoff
 
 ---
 
@@ -735,7 +759,6 @@ Possible handling declarations include:
 
 ```text
 ALLOW
-REQUIRE_CONFIRMATION
 REQUIRE_HUMAN
 BLOCK
 ```

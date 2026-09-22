@@ -592,3 +592,100 @@ Trade-off / Consequence:
 - Some drift situations require manual review before automation can resume.
 - Capabilities may temporarily become unavailable instead of being automatically repaired.
 - The system must preserve enough failure and evidence context to support later diagnosis and artifact updates.
+
+## D026 — EffectiveCapability Wraps the Resolved Capability Artifact
+
+Decision:
+`EffectiveCapability` is a thin resolved wrapper around a structurally valid `CapabilityArtifact`, plus resolution metadata describing how the Registry produced it.
+
+The executable workflow schema remains defined by `CapabilityArtifact`.
+
+Conceptually:
+
+```text
+EffectiveCapability
+├── artifact: CapabilityArtifact
+└── resolution_metadata
+
+resolution_metadata may include:
+- base capability version,
+- applied override identifier,
+- tenant identifier,
+- application version,
+- other resolution context needed for evidence and debugging.
+Replay executes the resolved artifact and does not reinterpret or re-resolve Registry metadata.
+
+Reason:
+- Avoids duplicating the complete Capability Artifact schema.
+- Keeps execution semantics defined in one place.
+- Makes Registry resolution observable without coupling Replay to Registry internals.
+- Preserves a clean boundary between reusable capability definition and resolution context.
+
+Trade-off / Consequence:
+- Replay accesses executable fields through the wrapped artifact.
+- Resolution metadata must remain descriptive and must not become a second source of workflow behavior.
+
+## D027 — v0 Overrides Specialize ControlTarget Resolution Hints Only
+
+Decision:
+Capability Registry v0 supports narrow tenant/version overrides that specialize `ControlTarget` resolution hints.
+
+Overrides identify targets by stable `semantic_name` rather than by artifact array position or generic field path.
+
+The v0 allowlist contains:
+
+- `accessible_name`
+- `label`
+- `context`
+- `fallbacks`
+
+The following target identity fields are protected:
+
+- `semantic_name`
+- `target_kind`
+
+Overrides may not modify workflow structure or business semantics, including:
+
+- step order,
+- action types,
+- input bindings,
+- declared outputs,
+- runtime outcomes and failures,
+- success semantics,
+- or policy metadata.
+
+A target override applies consistently to matching `ControlTarget` references throughout the resolved capability.
+
+Reason:
+- Keeps specialization focused on how the same logical control is located on different tenant or version surfaces.
+- Avoids a generic deep-merge or JSON-patch mechanism.
+- Preserves stable workflow semantics while allowing practical UI variation.
+- Using `semantic_name` avoids brittle patches tied to step indexes or artifact layout.
+
+Trade-off / Consequence:
+- v0 cannot represent every possible tenant or version difference through overrides.
+- Material workflow differences require a separately reviewed capability variant.
+- The allowlist may be extended in future versions when a concrete need is demonstrated.
+
+## D028 — Hard Failures Fail by Default and May Explicitly Escalate
+
+Decision:
+A matched hard failure terminates Replay with `FAILURE` by default.
+
+A hard failure may explicitly declare:
+
+`escalation_policy: REQUIRE_HUMAN`
+
+When declared, Replay returns `ESCALATED` and enters the same-session human handoff flow instead of terminating.
+
+No additional hard-failure escalation policies are supported in v0.
+
+Reason:
+- Gives hard failures deterministic default behavior.
+- Keeps human escalation explicit rather than implicit.
+- Avoids adding a complex escalation policy system in v0.
+- Aligns hard-failure handling with the existing Replay and Handoff contracts.
+
+Trade-off / Consequence:
+- Hard failures without explicit escalation terminate the run.
+- Capability authors must deliberately opt into human intervention for known failure states.
