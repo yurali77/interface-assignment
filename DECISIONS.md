@@ -193,3 +193,123 @@ Trade-off / Consequence:
 - The system will need a clear mechanism for resolving base artifacts together with applicable tenant or version overrides.
 - The boundary between stable base behavior and tenant-specific variation must be defined carefully.
 - Drift management becomes an explicit concern, but changes can be localized to overrides instead of forcing full artifact replacement.
+
+## D011 — Capability Artifacts Use Typed Action and Condition Hierarchies
+
+Decision:
+Capability Artifacts use typed action and condition hierarchies rather than a single generic object with many optional fields.
+
+The initial action hierarchy is:
+
+- `ClickAction`
+- `TypeAction`
+- `SelectAction`
+- `ReadAction`
+- `NavigateAction`
+- `WaitAction`
+
+The initial condition hierarchy is:
+
+- `TargetVisibleCondition`
+- `TargetNotVisibleCondition`
+- `TextPresentCondition`
+- `ValueEqualsCondition`
+- `RouteMatchesCondition`
+- `SemanticStateCondition`
+- `CompositeCondition` with `AND` / `OR`
+
+Reason:
+- Different action types require different fields and validation rules.
+- Typed schemas make invalid combinations easier to detect before execution.
+- Replay can dispatch deterministically based on the action type.
+- A shared condition model allows the same verification abstraction to be reused across step expectations, waits, outcome detection, failure detection, and final success checkpoints.
+- This keeps the Artifact strongly typed and reviewable rather than relying on loosely structured dictionaries.
+
+Trade-off / Consequence:
+- More schema types must be defined and maintained.
+- Adding a new action or condition requires an explicit schema extension.
+- The stronger type system adds some implementation overhead, but improves validation, replay clarity, and long-term extensibility.
+
+
+## D012 — All UI References Use the Shared ControlTarget Abstraction
+
+Decision:
+All UI element references in a Capability Artifact should use the same abstract `ControlTarget` model whenever possible.
+
+This includes UI references used by:
+
+- actions,
+- output extraction,
+- step expected states,
+- runtime outcome detection,
+- failure detection,
+- success checkpoints.
+
+`ControlTarget` represents semantic target identity rather than a Playwright-specific locator.
+
+Reason:
+- Using one target abstraction prevents different parts of the Artifact from developing separate locator models.
+- Actions, reads, checkpoints, and conditions all ultimately need to identify UI objects and should share the same representation.
+- Keeping target identity abstract preserves the Surface boundary and avoids coupling the Artifact to Playwright or a clean DOM.
+- The same Artifact model can later be resolved through other surface implementations such as accessibility-based or desktop automation.
+
+Trade-off / Consequence:
+- The Surface layer must support target resolution consistently across actions, observations, extraction, and verification.
+- Some legacy interfaces may require surface-specific fallback hints.
+- Those hints may be stored as secondary resolution information, but they should not replace the semantic `ControlTarget` identity.
+
+
+## D013 — Step Verification and Capability Success Verification Are Separate
+
+Decision:
+The system distinguishes between step-level expected state verification and capability-level success verification.
+
+A state-changing step should normally define an `expected_state` that verifies the workflow advanced correctly after the action.
+
+The Capability Artifact separately defines a final `success_checkpoint` that verifies the complete requested goal was achieved.
+
+Conceptually:
+
+`step.expected_state`
+= verifies that one execution step produced the expected local state.
+
+`success_checkpoint`
+= verifies that the overall capability completed successfully for the supplied invocation inputs.
+
+Reason:
+- A UI action completing without an execution error does not prove that the workflow reached the correct next state.
+- Step-level verification detects problems early instead of allowing Replay to continue blindly.
+- The final success checkpoint provides stronger end-to-end verification than relying on the final step alone.
+- Capability success may require checking multiple business facts and required outputs rather than one local UI transition.
+
+Trade-off / Consequence:
+- Artifacts contain more verification metadata.
+- Replay must evaluate conditions throughout execution rather than only at the end.
+- Checkpoints must be designed carefully to be strong enough to prove success without becoming unnecessarily brittle.
+
+
+## D014 — Runtime Conditions Are Declared in Artifacts and Executed Deterministically
+
+Decision:
+Capability Artifacts explicitly declare capability-specific runtime conditions in three categories:
+
+- business outcomes,
+- recoverable conditions,
+- hard failures.
+
+Each declared condition includes a deterministic detection rule. Recoverable conditions may also include a bounded recovery policy.
+
+The Replay Engine executes these rules deterministically and does not invoke an LLM to decide how to handle normal runtime conditions.
+
+Reason:
+- Expected business outcomes must be distinguishable from automation failures.
+- Known recoverable conditions should be handled predictably rather than through open-ended reasoning.
+- Hard failures need clear stopping semantics and debuggable structured results.
+- Declaring runtime semantics in the Artifact allows capability-specific behavior to remain reviewable and reusable while the Replay Engine provides a common execution model.
+- This follows the requirement that deterministic replay deliberately handle business outcomes, recoverable runtime conditions, and hard failures rather than blindly continuing.
+
+Trade-off / Consequence:
+- Artifact authors and the Artifact Builder must explicitly model known runtime states.
+- Recovery behavior must remain bounded, such as a limited retry count or a known one-time recovery action.
+- Unknown runtime conditions still require a hard failure or human-escalation path.
+- The Artifact should only declare recovery behavior supported by discovery evidence or explicit configuration and should not invent unsupported production behavior.
