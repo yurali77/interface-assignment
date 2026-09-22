@@ -313,3 +313,282 @@ Trade-off / Consequence:
 - Recovery behavior must remain bounded, such as a limited retry count or a known one-time recovery action.
 - Unknown runtime conditions still require a hard failure or human-escalation path.
 - The Artifact should only declare recovery behavior supported by discovery evidence or explicit configuration and should not invent unsupported production behavior.
+
+## D015 — Replay Receives a Resolved Effective Capability
+
+Decision:
+The Replay Engine receives an already resolved `EffectiveCapability` rather than a `capability_id` or version-selection request.
+
+Capability lookup, version selection, and tenant/version override resolution happen before Replay begins.
+
+The Replay Engine is responsible only for deterministic execution of the capability it receives.
+
+Reason:
+- Keeps capability resolution separate from execution.
+- Prevents Replay from taking on registry, version-selection, or override-resolution responsibilities.
+- Makes the Replay contract simpler and easier to test.
+- Allows the same Replay Engine to execute capabilities from different registry or storage implementations.
+
+Trade-off / Consequence:
+- An orchestration or registry layer must resolve the capability before invoking Replay.
+- The resolved capability must contain all information needed for execution.
+- Replay cannot independently fall back to another capability version if execution fails.
+
+
+## D016 — Replay Results Use a Typed Union
+
+Decision:
+`ReplayResult` is represented as a typed union:
+
+- `SuccessResult`
+- `BusinessOutcomeResult`
+- `FailureResult`
+- `EscalatedResult`
+
+Each result type has a distinct payload associated with its status.
+
+Reason:
+- Prevents invalid combinations such as `status: SUCCESS` with a failure payload.
+- Makes caller handling explicit and deterministic.
+- Preserves the semantic distinction between successful completion, expected business outcomes, execution failures, and human escalation.
+- Aligns with the typed action and condition approach used by the Capability Artifact.
+
+Trade-off / Consequence:
+- Multiple result models must be defined and maintained.
+- Callers must explicitly handle each supported result variant.
+- Adding a new top-level replay outcome requires extending the result union.
+
+
+## D017 — Human Escalation Pauses Rather Than Terminates Replay
+
+Decision:
+`ESCALATED` represents a paused replay state rather than an automatic terminal failure.
+
+When escalation occurs, control may be transferred to a human while preserving the same logical replay run and live session.
+
+The same `run_id`, `session_id`, `capability_id`, and `capability_version` remain associated with the replay across handoff and resume.
+
+Reason:
+- Human handoff is part of the required execution model rather than equivalent to failure.
+- Preserving the same run and live session allows a human to operate on the exact application state reached by automation.
+- It keeps evidence, execution history, and intervention context connected to one logical run.
+
+Trade-off / Consequence:
+- Replay lifecycle is no longer purely terminal; a run may temporarily enter a paused state.
+- Runtime state must remain available while the human owns the session.
+- Individual interventions require their own identifiers so multiple handoffs within one run can be distinguished.
+
+
+## D018 — Replay Re-Observes State Before Resuming Automation
+
+Decision:
+After human intervention or recovery, Replay must re-observe the current live application state before deciding how to continue.
+
+Replay first evaluates whether the interrupted step's completion condition is already satisfied.
+
+If it is satisfied, the step is marked complete and Replay continues without repeating the original action.
+
+If it is not satisfied, Replay may continue only through declared deterministic behavior such as an allowed retry, known recovery path, re-escalation, or failure.
+
+Reason:
+- Human or recovery actions may already have advanced the application state.
+- Blindly repeating the interrupted action could cause duplicate submissions or other unsafe state changes.
+- Re-observation keeps resume behavior deterministic without requiring LLM reasoning.
+
+Trade-off / Consequence:
+- Resume requires the interrupted step to have a well-defined completion condition.
+- Replay must preserve enough execution state to know which step was interrupted.
+- Some ambiguous post-handoff states may require another escalation or failure rather than automatic continuation.
+
+
+## D019 — Runtime Conditions Use Deterministic Precedence and Bounded Recovery
+
+Decision:
+Replay evaluates declared runtime conditions before generic step verification.
+
+When multiple condition categories match the same observation, v0 uses the fixed precedence:
+
+`HARD_FAILURE > BUSINESS_OUTCOME > RECOVERABLE_CONDITION`
+
+Multiple matches within the same category are treated as an ambiguous runtime state rather than resolved by declaration order.
+
+Recoverable conditions may execute only artifact-declared, deterministic, bounded recovery policies.
+
+Retry limits use `max_retries`, where the original attempt is not counted as a retry.
+
+Reason:
+- Known runtime states should not be misclassified as generic expected-state failures.
+- Fixed precedence avoids nondeterministic "first match wins" behavior.
+- Bounded recovery prevents open-ended retry loops.
+- Explicit recovery behavior preserves deterministic replay without an LLM in the loop.
+
+Trade-off / Consequence:
+- Artifact condition rules must be designed to avoid unnecessary overlap.
+- Unknown or ambiguous states may terminate or escalate instead of being automatically repaired.
+- Replay cannot improvise recovery behavior that is not declared by the capability.
+
+
+## D020 — Step Completion Requires Verified Post-Conditions
+
+Decision:
+A Replay step is not considered complete merely because the underlying automation action executed without an API error.
+
+For state-changing actions, the declared `expected_state` must be verified before the step is marked complete.
+
+`READ` steps complete when the declared value is successfully extracted and its result expectation is satisfied.
+
+`WAIT` steps complete only when their declared condition becomes true within the allowed wait policy.
+
+`last_completed_step_id` therefore refers to the last step that fully satisfied its completion contract, not the last step attempted.
+
+Reason:
+- Successful UI interaction does not prove that the application reached the intended state.
+- Post-condition verification detects drift and runtime failures close to the step where they occur.
+- It gives `step_context`, failure reporting, and resume logic precise semantics.
+- It supports reliable final checkpoint verification instead of assuming workflow success from action execution alone.
+
+Trade-off / Consequence:
+- Artifacts must define meaningful completion conditions for executable steps.
+- Replay performs additional observation and verification work after actions.
+- Poorly designed or overly brittle conditions can cause false failures and must be reviewed carefully.
+
+## D021 — Capability Registry Selects an Approved, Active, Compatible Capability Version
+
+Decision:
+The Capability Registry is responsible for selecting the capability version that is approved, active, and compatible with the current execution context before Replay begins.
+
+Replay does not select versions itself.
+
+A capability version may be approved without being active, and a version may be active in principle but still be incompatible with the current tenant or application version.
+
+Reason:
+- Keeps version selection outside the Replay Engine.
+- Separates review state from execution state.
+- Prevents unapproved or incompatible capability versions from reaching deterministic replay.
+- Allows new versions to be reviewed before they are activated.
+
+Trade-off / Consequence:
+- Registry metadata must track approval and active state.
+- Resolution may fail before Replay if no valid version exists.
+- Version lifecycle becomes an explicit Registry responsibility rather than an execution concern.
+
+
+## D022 — Capability Resolution Uses Tenant and Application Context
+
+Decision:
+Capability resolution is based on more than `capability_id`.
+
+The Registry uses resolution context including:
+
+- `capability_id`,
+- `tenant_id`,
+- vendor/product context,
+- application version context.
+
+Conceptually:
+
+`capability_id + tenant_id + app/vendor version context -> EffectiveCapability`
+
+The Registry selects a compatible base capability and then applies any applicable tenant/version specialization.
+
+Reason:
+- The same vendor product may behave differently across tenants or application versions.
+- A capability that is active may still be incompatible with the current application version.
+- Resolution context makes multi-tenant and version specialization explicit rather than embedding it in Replay.
+
+Trade-off / Consequence:
+- Registry resolution logic is more complex than a simple lookup by `capability_id`.
+- Execution callers must provide enough context for deterministic resolution.
+- Missing or ambiguous application context may cause resolution to fail rather than guessing.
+
+
+## D023 — Tenant and Version Overrides Are Narrow, Explicit Patches
+
+Decision:
+Tenant/version overrides use a narrow specialization model.
+
+Overrides may adapt surface-specific or tenant-specific details such as:
+
+- `ControlTarget` resolution hints,
+- frame, region, or context hints,
+- route metadata,
+- compatibility metadata,
+- surface-specific fallback information.
+
+Overrides must not silently redefine:
+
+- step order,
+- business semantics,
+- declared outputs,
+- success meaning,
+- risk policy,
+- or the overall workflow.
+
+Overrides are applied as field-level explicit patches over an allowlist of overrideable fields.
+
+Generic deep merge is not used.
+
+Reason:
+- Preserves a meaningful shared base capability across tenants.
+- Prevents tenant overrides from becoming hidden copies of entirely different workflows.
+- Explicit patching makes specialization reviewable and predictable.
+- Avoids unsafe or ambiguous merge behavior for arrays, steps, conditions, and policy fields.
+
+Trade-off / Consequence:
+- The override schema must explicitly define which fields may be patched.
+- Some tenant differences cannot be represented as a simple override.
+- Material workflow differences require a separately reviewed capability variant or specialization.
+
+
+## D024 — Override Resolution Uses Deterministic Specificity Precedence
+
+Decision:
+When multiple overrides could apply, the Registry resolves them using fixed specificity precedence:
+
+1. tenant + exact application version
+2. tenant + version family or range
+3. global version-specific override
+4. base capability
+
+The Registry must not rely on declaration order or "first match wins" behavior.
+
+If multiple overrides match at the same highest specificity level, resolution fails with an explicit conflict rather than choosing one arbitrarily.
+
+Reason:
+- Makes capability resolution deterministic.
+- Prevents configuration ordering from silently changing production behavior.
+- Ensures the most specific compatible specialization is selected.
+- Makes overlapping override definitions visible during resolution.
+
+Trade-off / Consequence:
+- Override metadata must contain enough context to determine specificity.
+- Conflicting configuration causes resolution failure instead of automatic fallback.
+- Teams must review and remove overlapping overrides when conflicts are detected.
+
+
+## D025 — Drift Is Detected and Escalated, Not Automatically Repaired
+
+Decision:
+Drift handling in v0 is conservative.
+
+If Registry-time or Replay-time evidence indicates that the current capability assumptions no longer match the target application, the system may mark the affected capability or override as incompatible or `needs_review`.
+
+The system does not automatically:
+
+- rewrite the production Capability Artifact,
+- modify overrides,
+- promote human actions into automation,
+- or use an LLM to repair production behavior.
+
+Registry handles resolution-time compatibility and drift signals, while Replay reports execution-time drift evidence through structured failures and evidence.
+
+Reason:
+- Automatic repair could silently change production behavior without review.
+- Drift often indicates that the existing artifact assumptions are no longer trustworthy.
+- Preserving evidence and requiring review keeps changes explicit and auditable.
+- This keeps v0 focused on detection and safe failure rather than autonomous repair.
+
+Trade-off / Consequence:
+- Some drift situations require manual review before automation can resume.
+- Capabilities may temporarily become unavailable instead of being automatically repaired.
+- The system must preserve enough failure and evidence context to support later diagnosis and artifact updates.
