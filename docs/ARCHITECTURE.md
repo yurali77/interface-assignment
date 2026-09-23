@@ -810,8 +810,25 @@ EffectiveCapability
 or
 ResolutionFailure
 ```
+The Registry resolves capabilities before Replay begins.
 
-The LLM reasons; the Discovery Agent orchestrates.
+Replay does not query the Registry during normal execution.
+
+### Orchestration ↔ Replay Engine
+
+```text
+Input:
+EffectiveCapability
++ invocation inputs
++ execution context
++ LiveSession
+
+Output:
+ReplayResult
+```
+Replay executes the already resolved capability deterministically.
+
+The Replay Engine does not select capability versions, apply tenant overrides, or perform Registry resolution.
 
 ### Discovery / Replay ↔ Policy
 
@@ -848,18 +865,6 @@ Capability Artifact
 ```
 
 Discovery records concrete execution; the Builder creates reusable automation.
-
-### Replay Engine ↔ Capability Registry
-
-```text
-Input:
-capability_id + version/context
-
-Output:
-Effective Capability
-```
-
-Registry resolves artifacts; Replay executes them.
 
 ### Execution Layer ↔ Evidence Logger
 

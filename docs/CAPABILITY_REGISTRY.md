@@ -80,13 +80,23 @@ After selecting the base capability, the Registry resolves any applicable tenant
 
 Overrides use a narrow specialization model.
 
-They may adapt:
+In v0, overrides specialize only `ControlTarget` resolution hints.
 
-- `ControlTarget` resolution hints,
-- frame, region, or context hints,
-- route metadata,
-- compatibility metadata,
-- surface-specific fallback information.
+Overrides identify targets by stable `semantic_name`.
+
+The v0 override allowlist is:
+
+- `accessible_name`
+- `label`
+- `context`
+- `fallbacks`
+
+The following target identity fields are protected:
+
+- `semantic_name`
+- `target_kind`
+
+Overrides must not modify workflow structure or business semantics.
 
 Overrides must not silently redefine:
 
@@ -125,26 +135,31 @@ OVERRIDE_RESOLUTION_CONFLICT
 
 ## 5. Override Application
 
-Overrides are applied as field-level explicit patches.
+Overrides are applied as explicit target-resolution patches.
 
-The Registry does not perform a generic deep merge.
+The Registry does not perform a generic deep merge or arbitrary field-path patch.
+
+Conceptually:
 
 ```text
-Base Capability
+Base CapabilityArtifact
 +
-Explicit Override Patch
-→ validate patch
-→ apply patch
+TargetOverride identified by semantic_name
+→ validate allowlisted fields
+→ apply patch to matching ControlTarget references
+→ structurally validate resolved artifact
 → EffectiveCapability
 ```
 
-Before applying a patch, the Registry verifies that:
+Before applying a target override, the Registry verifies that:
+- the referenced semantic_name exists,
+- every patched field is in the v0 allowlist,
+- semantic_name and target_kind are unchanged,
+- protected workflow semantics are not modified.
 
-- every patched field is explicitly overrideable,
-- the patch does not modify protected workflow semantics,
-- the resulting artifact remains structurally valid.
+A target override applies consistently to matching ControlTarget references throughout the resolved capability.
 
-If the patch touches a protected or unsupported field, resolution fails with:
+If validation fails, resolution returns:
 
 ```text
 INVALID_OVERRIDE_PATCH
@@ -165,14 +180,25 @@ It represents the exact capability definition Replay should execute after:
 - tenant/version specialization,
 - patch validation.
 
+`EffectiveCapability` is a thin resolved wrapper around the executable `CapabilityArtifact`.
+
 Conceptually:
 
 ```text
 EffectiveCapability
-=
-approved active compatible base capability
-+
-one valid resolved specialization
+├── artifact: CapabilityArtifact
+└── resolution_metadata
+    ├── base_capability_version
+    ├── applied_override_id?
+    ├── tenant_id
+    └── app_version
+
+The artifact contains the resolved executable workflow.
+resolution_metadata records how the Registry produced that resolved capability for evidence, debugging, and traceability.
+
+Replay executes effective_capability.artifact.
+
+Replay does not interpret resolution_metadata as workflow behavior and does not perform Registry resolution itself.
 ```
 
 The Replay Engine does not re-select versions or re-apply overrides.

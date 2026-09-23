@@ -188,6 +188,20 @@ failure:
   code: AMBIGUOUS_RUNTIME_MATCH
 ```
 
+### Hard Failure Handling
+
+A matched hard failure returns `FAILURE` by default.
+
+If the matched hard failure declares:
+
+```text
+escalation_policy: REQUIRE_HUMAN
+
+Replay returns ESCALATED and enters the same-session human handoff flow.
+
+No other hard-failure escalation policies are supported in v0.
+```
+
 ---
 
 ## 7. Recovery and Retry

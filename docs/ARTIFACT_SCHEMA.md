@@ -597,6 +597,9 @@ recoverable_conditions:
       type: RETRY_STEP
       max_retries: 1
 ```
+`max_retries` counts additional retries after the original execution attempt. For example, `max_retries: 1` allows one retry after the initial attempt.
+
+After recovery, Replay re-observes the current state and checks the current step completion condition before deciding whether the original step needs to be retried.
 
 Recovery must remain bounded and deterministic.
 
