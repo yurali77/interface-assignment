@@ -192,14 +192,13 @@ EffectiveCapability
     ├── applied_override_id?
     ├── tenant_id
     └── app_version
-
+```
 The artifact contains the resolved executable workflow.
 resolution_metadata records how the Registry produced that resolved capability for evidence, debugging, and traceability.
 
 Replay executes effective_capability.artifact.
 
 Replay does not interpret resolution_metadata as workflow behavior and does not perform Registry resolution itself.
-```
 
 The Replay Engine does not re-select versions or re-apply overrides.
 

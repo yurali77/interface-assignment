@@ -774,15 +774,9 @@ Replay Engine
 
 The base artifact should capture stable vendor/product behavior.
 
-Overrides may specialize details such as:
+In v0, overrides are limited to `ControlTarget` resolution hints as defined in `docs/CAPABILITY_REGISTRY.md`.
 
-```text
-terminology
-target resolution hints
-route patterns
-application versions
-tenant-specific configuration
-```
+Broader tenant/version specialization remains an architectural extension point but is not implemented in v0.
 
 The initial implementation does not need to implement production-scale multi-tenant resolution.
 

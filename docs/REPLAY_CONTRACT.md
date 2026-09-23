@@ -196,11 +196,11 @@ If the matched hard failure declares:
 
 ```text
 escalation_policy: REQUIRE_HUMAN
+```
 
 Replay returns ESCALATED and enters the same-session human handoff flow.
 
 No other hard-failure escalation policies are supported in v0.
-```
 
 ---
 

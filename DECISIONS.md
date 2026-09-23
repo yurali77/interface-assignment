@@ -606,7 +606,7 @@ Conceptually:
 EffectiveCapability
 ├── artifact: CapabilityArtifact
 └── resolution_metadata
-
+```
 resolution_metadata may include:
 - base capability version,
 - applied override identifier,
@@ -624,7 +624,6 @@ Reason:
 Trade-off / Consequence:
 - Replay accesses executable fields through the wrapped artifact.
 - Resolution metadata must remain descriptive and must not become a second source of workflow behavior.
-```
 
 ## D027 — v0 Overrides Specialize ControlTarget Resolution Hints Only
 
