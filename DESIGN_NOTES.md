@@ -34,7 +34,9 @@ ReplayResult SUCCESS examples include `checkpoint.checkpoint_id`. `CapabilityArt
 
 - Unimplemented policy and verification seams raise `_SeamNotImplemented` and return `FailureResult` (`UNKNOWN` / `SEAM_NOT_IMPLEMENTED`).
 - Policy does not default to ALLOW, so `Surface.act` is not reached until a real Policy Engine exists (or a test subclass opts in).
-- Runtime-condition, step-completion, success-checkpoint, and required-output seams do not return fake CONTINUE / verified / satisfied.
+- Runtime-condition, success-checkpoint, and required-output seams still fail closed.
+- Step completion is implemented for CLICK/TYPE/SELECT (`expected_state` required) and READ (`extracted_value` / `non_empty`). NAVIGATE/WAIT remain unimplemented.
+- Missing Observation facts for a `semantic_name` are unresolved (fail closed), not treated as not-visible/false.
 - `SUCCESS` is intentionally unavailable in production until checkpoint and output semantics are implemented.
 
 Tests may subclass and override seams to exercise call order. That opt-in does not change production defaults.

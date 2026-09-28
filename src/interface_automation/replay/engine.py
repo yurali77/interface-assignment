@@ -4,7 +4,23 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
 
-from interface_automation.models.artifact import Step
+from interface_automation.models.artifact import (
+    ClickAction,
+    CompositeCondition,
+    Condition,
+    NavigateAction,
+    ReadAction,
+    RouteMatchesCondition,
+    SelectAction,
+    SemanticStateCondition,
+    Step,
+    TargetNotVisibleCondition,
+    TargetVisibleCondition,
+    TextPresentCondition,
+    TypeAction,
+    ValueEqualsCondition,
+    WaitAction,
+)
 from interface_automation.models.replay import (
     CheckpointVerification,
     FailureCategory,
@@ -164,13 +180,78 @@ class ReplayEngine:
     ) -> _RuntimeSeamResult:
         raise _SeamNotImplemented("Runtime-condition evaluation is not implemented.")
 
+    def _evaluate_condition(
+        self, condition: Condition, observation: Observation
+    ) -> bool:
+        """Return whether a condition is true on observed facts.
+
+        Missing target facts are unresolved (fail closed), not false.
+        """
+        if isinstance(condition, RouteMatchesCondition):
+            raise _SeamNotImplemented("ROUTE_MATCHES is not implemented.")
+        if isinstance(condition, TargetVisibleCondition):
+            visible = _observed_visibility(observation, condition.target.semantic_name)
+            if visible is None:
+                raise _SeamNotImplemented(
+                    f"Target {condition.target.semantic_name!r} was not observed."
+                )
+            return visible is True
+        if isinstance(condition, TargetNotVisibleCondition):
+            visible = _observed_visibility(observation, condition.target.semantic_name)
+            if visible is None:
+                raise _SeamNotImplemented(
+                    f"Target {condition.target.semantic_name!r} was not observed."
+                )
+            return visible is False
+        if isinstance(condition, TextPresentCondition):
+            return condition.text in observation.visible_text
+        if isinstance(condition, ValueEqualsCondition):
+            value = _observed_value(observation, condition.target.semantic_name)
+            if value is None:
+                raise _SeamNotImplemented(
+                    f"Value for {condition.target.semantic_name!r} was not observed."
+                )
+            return value == condition.expected_value
+        if isinstance(condition, SemanticStateCondition):
+            return condition.state in observation.semantic_states
+        if isinstance(condition, CompositeCondition):
+            if condition.type == "AND":
+                return _evaluate_and(self, condition.conditions, observation)
+            return _evaluate_or(self, condition.conditions, observation)
+        raise _SeamNotImplemented("Unsupported condition type.")
+
     def _verify_step_completion(
         self,
         step: Step,
         observation: Observation,
         act_result: SurfaceActionResult,
     ) -> bool:
-        raise _SeamNotImplemented("Step-completion verification is not implemented.")
+        action = step.action
+        if isinstance(action, NavigateAction | WaitAction):
+            raise _SeamNotImplemented(
+                f"{action.type} step completion is not implemented."
+            )
+        if isinstance(action, ReadAction):
+            if not act_result.operation_succeeded:
+                return False
+            if act_result.extracted_value is None:
+                return False
+            if (
+                step.result_expectation is not None
+                and step.result_expectation.non_empty
+                and act_result.extracted_value == ""
+            ):
+                return False
+            return True
+        if isinstance(action, ClickAction | TypeAction | SelectAction):
+            if step.expected_state is None:
+                raise _SeamNotImplemented(
+                    f"{action.type} step has no expected_state; completion is unresolved."
+                )
+            return self._evaluate_condition(
+                step.expected_state.condition, observation
+            )
+        raise _SeamNotImplemented("Unsupported action type for step completion.")
 
     def _verify_success_checkpoint(
         self, request: ReplayRequest, observation: Observation | None
@@ -179,6 +260,50 @@ class ReplayEngine:
 
     def _verify_required_outputs(self, request: ReplayRequest) -> bool:
         raise _SeamNotImplemented("Required-output extraction is not implemented.")
+
+
+def _observed_visibility(observation: Observation, semantic_name: str) -> bool | None:
+    for item in observation.target_visibilities:
+        if item.semantic_name == semantic_name:
+            return item.visible
+    return None
+
+
+def _observed_value(observation: Observation, semantic_name: str) -> str | None:
+    for item in observation.target_values:
+        if item.semantic_name == semantic_name:
+            return item.value
+    return None
+
+
+def _evaluate_and(
+    engine: ReplayEngine, conditions: list[Condition], observation: Observation
+) -> bool:
+    unresolved: _SeamNotImplemented | None = None
+    for condition in conditions:
+        try:
+            if not engine._evaluate_condition(condition, observation):
+                return False
+        except _SeamNotImplemented as exc:
+            unresolved = exc
+    if unresolved is not None:
+        raise unresolved
+    return True
+
+
+def _evaluate_or(
+    engine: ReplayEngine, conditions: list[Condition], observation: Observation
+) -> bool:
+    unresolved: _SeamNotImplemented | None = None
+    for condition in conditions:
+        try:
+            if engine._evaluate_condition(condition, observation):
+                return True
+        except _SeamNotImplemented as exc:
+            unresolved = exc
+    if unresolved is not None:
+        raise unresolved
+    return False
 
 
 def _map_surface_failure(
