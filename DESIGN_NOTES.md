@@ -12,3 +12,33 @@ The typed Action and Condition taxonomies include `NAVIGATE`, `WAIT`, and `ROUTE
 - **BusinessOutcome.result_payload:** the frozen schema lists an optional `result_payload` conceptually. Its serialized shape is not defined. It is not implemented.
 
 No replacement schema is being invented until implementation actually requires resolution.
+
+## Surface implementation contract
+
+These types are a Surface→Replay implementation snapshot. They are not Artifact Schema.
+
+- **Observation** is a fact snapshot for Replay condition evaluation. Facts about targets are keyed by `semantic_name`.
+- A missing `semantic_name` in Observation means UNKNOWN / NOT OBSERVED. It must not be treated as `visible=False`.
+- **SurfaceActionResult** reports only whether the Surface operation succeeded (plus optional READ `extracted_value`). It does not mark a Replay step complete.
+- **LiveSession** exposes only `session_id` and `available`. Playwright Page/Browser/BrowserContext/Locator/DOM handles stay private to `PlaywrightSurface`.
+- There is no `Surface.evaluate(condition)`. Replay evaluates Condition truth against Observation facts.
+- Architecture names `capture_evidence()`, but its request/result types are not frozen. Evidence method typing and Evidence Logger are deferred. Do not add a silent no-op `capture_evidence()`.
+
+## ReplayResult checkpoint identity
+
+ReplayResult SUCCESS examples include `checkpoint.checkpoint_id`. `CapabilityArtifact.success_checkpoint` has no stable checkpoint identifier. `checkpoint_id` is optional on the result model. Replay must not synthesize an ID until the contract is clarified.
+
+## ReplayEngine skeleton
+
+`ReplayEngine.execute` implements orchestration order only. Production defaults are fail-closed:
+
+- Unimplemented policy and verification seams raise `_SeamNotImplemented` and return `FailureResult` (`UNKNOWN` / `SEAM_NOT_IMPLEMENTED`).
+- Policy does not default to ALLOW, so `Surface.act` is not reached until a real Policy Engine exists (or a test subclass opts in).
+- Runtime-condition, step-completion, success-checkpoint, and required-output seams do not return fake CONTINUE / verified / satisfied.
+- `SUCCESS` is intentionally unavailable in production until checkpoint and output semantics are implemented.
+
+Tests may subclass and override seams to exercise call order. That opt-in does not change production defaults.
+
+
+
+

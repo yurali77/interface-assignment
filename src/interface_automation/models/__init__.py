@@ -1,5 +1,17 @@
 """Pydantic models for capabilities, actions, and run results."""
 
+from interface_automation.models.replay import (
+    BusinessOutcomeResult,
+    EffectiveCapability,
+    EscalatedResult,
+    ExecutionContext,
+    FailureResult,
+    ReplayRequest,
+    ReplayResult,
+    ResolutionMetadata,
+    SuccessResult,
+)
+
 from interface_automation.models.artifact import (
     Action,
     BusinessOutcome,
@@ -42,6 +54,7 @@ from interface_automation.models.artifact import (
 __all__ = [
     "Action",
     "BusinessOutcome",
+    "BusinessOutcomeResult",
     "CapabilityArtifact",
     "CapabilityIdentity",
     "ClickAction",
@@ -49,7 +62,11 @@ __all__ = [
     "CompositeCondition",
     "Condition",
     "ControlTarget",
+    "EffectiveCapability",
+    "ExecutionContext",
+    "EscalatedResult",
     "ExpectedState",
+    "FailureResult",
     "HardFailure",
     "InputConstraints",
     "InputDefinition",
@@ -62,6 +79,10 @@ __all__ = [
     "ReadAction",
     "RecoverableCondition",
     "RecoveryPolicy",
+    "ReplayRequest",
+    "ReplayResult",
+    "ResolutionMetadata",
+    "SuccessResult",
     "ResultExpectation",
     "RouteMatchesCondition",
     "SelectAction",
