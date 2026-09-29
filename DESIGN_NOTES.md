@@ -2,6 +2,10 @@
 
 These are local implementation gaps. Frozen architecture/schema docs are unchanged.
 
+## Local banking demo (Member Search only)
+
+`interface_automation.demo.member_search` is a stdlib HTTP page for the first UI slice. Valid member is hard-coded `12345` / `Demo Member`. Invalid search shows `Member not found`. No accounts flow, auth, DB, PlaywrightSurface, or Replay wiring.
+
 ## Incomplete v0 types
 
 The typed Action and Condition taxonomies include `NAVIGATE`, `WAIT`, and `ROUTE_MATCHES`. Their executable payload fields are not fully specified by the frozen docs.
