@@ -4,7 +4,15 @@ These are local implementation gaps. Frozen architecture/schema docs are unchang
 
 ## Local banking demo (Member Search only)
 
-`interface_automation.demo.member_search` is a stdlib HTTP page for the first UI slice. Valid member is hard-coded `12345` / `Demo Member`. Invalid search shows `Member not found`. No accounts flow, auth, DB, PlaywrightSurface, or Replay wiring.
+`interface_automation.demo.member_search` is a stdlib HTTP page for the first UI slice. Valid member is hard-coded `12345` / `Demo Member`. Invalid search shows `Member not found`. No accounts flow, auth, DB, or Replay wiring.
+
+## PlaywrightSurface (Member Search slice)
+
+`PlaywrightSurface` implements `act` / `observe` / `get_session` against a caller-provided Playwright `Page`. TYPE/CLICK/READ are implemented. SELECT/NAVIGATE/WAIT fail closed as `OPERATION`.
+
+- **TYPE** fills `TypeAction.value_binding` as a literal string. Replay parameter expansion of `{{...}}` is not performed in Surface.
+- **observe()** reports `[data-semantic-name]` visibilities/values plus `body` `visible_text`. `semantic_states` is empty: Artifact examples use `CONFIRMATION_SCREEN` later in the flow; there is no documented mapping for Member Detail, so none is invented.
+- Playwright `Page`/`Browser`/`Locator` stay on the adapter, not on Observation/LiveSession/SurfaceActionResult.
 
 ## Incomplete v0 types
 

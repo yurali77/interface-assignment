@@ -9,6 +9,7 @@ description = "Computer-use automation system"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2",
+    "playwright>=1.40",
 ]
 
 [project.optional-dependencies]

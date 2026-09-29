@@ -9,10 +9,12 @@ from interface_automation.surface.base import (
     TargetValue,
     TargetVisibility,
 )
+from interface_automation.surface.playwright import PlaywrightSurface
 
 __all__ = [
     "LiveSession",
     "Observation",
+    "PlaywrightSurface",
     "Surface",
     "SurfaceActionResult",
     "SurfaceFailure",
